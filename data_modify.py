@@ -7,6 +7,7 @@ import sys
 def modify_charge(l,l_b,l_a):
     '''
     Modifying the charge of certain atoms of lammps data file from EMC software...
+    Force field used is OPLS-UA
     '''
     f,i = float,int
     l_modified = l
