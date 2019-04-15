@@ -1,0 +1,132 @@
+# Lammps atomistic input script
+# This input file is used to realize the following procedure.
+# 1.EM 2.NPT eq 3.NVT production run
+# Be sure to modify variable part before use
+######################################################
+# Variable part ----------------------
+
+variable  restartname  index  21
+variable  paramname    index  polymer
+variable  infilename   index  lammps-em-npt-nvt
+variable  Tstart       equal  440
+variable  Tstop        equal  440
+variable  Tdamp        equal  1000.0
+variable  Pstart       equal  5.992
+variable  Pstop        equal  5.992
+variable  Pdamp        equal  1000.0
+
+variable  PolyStart    equal  1
+variable  PolyEnd      equal  10005
+variable  OrganicStart equal  10006
+variable  organicEnd   equal  16089
+
+#--------------------------------------
+
+echo          screen
+units         real
+atom_style    full
+
+# Interaction potential definition ----
+
+pair_style    lj/cut/coul/long  12.0  12.0
+bond_style    harmonic
+special_bonds lj/coul  0  0  0.5
+kspace_style  pppm/cg  0.001
+dielectric    1.0
+
+#---------------------------------------
+
+read_restart  ${restartname}.restart
+include       ${paramname}.params
+
+#---------------------------------------
+
+timestep      1.0
+
+# Shell cd mkdir -----------------------
+
+shell mkdir EM
+shell cd EM
+
+# Minimize -----------------------------
+
+min_style     cg
+minimize      1.0e-5  1.0e-6  100000 10000
+velocity      all  create  300.0  4928459
+write_data    mini.data
+
+print         "Minimization Done, Starting NPT"
+
+# shell cd mkdir -----------------------
+
+shell cd ../
+shell mkdir npt
+shell cd npt
+
+# NPT ----------------------------------
+
+fix           1  all npt  temp  ${Tstart}  ${Tstop}  ${Tdamp}  iso  1.0  1.0  1000.0
+velocity      all  scale  300
+thermo        1000
+thermo_style  custom  step  vol  temp  press  etotal  evdwl  ecoul  ebond  eangle  edihed  density  
+log           npt.lammps
+run           100000
+unfix         1 
+write_restart npt.restart
+write_data    npt.data
+print         "NPT Done"
+
+#--------------------------------------
+
+reset_timestep 0
+shell cd ../
+shell mkdir nvtpd
+shell cd nvtpd
+
+#---------------------------------------
+
+group         organic  id  ${OrganicStart}:${OrganicEnd}
+group         poly     id  ${PolyStart}:${PolyEnd}
+
+# Compute ------------------------------
+
+compute  1  all  chunk/atom  bin/1d  z  lower  0.1  pbc  no  units  box
+fix  mdens  all  ave/chunk  100  10  1000  1  density/mass  ave  running  file  density.txt
+compute  2  organic  chunk/atom  bin/1d  z  lower  0.1  pbc  no  units  box
+fix  mdensW  all  ave/chunk  100  10  1000  1  density/mass  ave  running  file  densityW.txt
+compute  3  poly  chunk/atom  bin/1d  z  lower  0.1  pbc  no  units  box
+fix  mdensP  all  ave/chunk  100  10  1000  1  density/mass  ave  running  file  densityP.txt
+compute  4  organic  msd  com  yes
+fix  msd1  all  ave/time  100  10  1000  c_4  mode  vector  file  c_msdall.txt  ave  running  start  1000000
+compute  5  poly  gyration
+fix  gya  all  ave/time  100  10  1000  c_5  mode  scalar  file  c_gyration.txt  ave  running
+compute  6  poly  group/group  organic
+fix  eg  all  ave/time  100  1  1000  c_6  file  eg.txt  mode  scalar  ave  one  start  100
+fix  eg2  all  ave/time  100  1  1000  c_6[*]  file  eg2.txt  mode  vector  ave  one  start  100
+compute  7  organic  chunk/atom  bin/2d  x  lower  1.0  y  lower  1.0  pbc  no  units  box
+fix  dens2D  organic  ave/chumk  100  10  1000  7  density/mass  ave  running  file  density2D.txt
+
+# NVT production -----------------------
+
+fix  1  all  npt  temp  ${Tstart}  ${Tstop}  ${Tdamp}  iso  ${Pstart}  ${Pstop}  ${Pdamp}  drag 0.2
+thermo  1000
+thermo_style  custom  step  vol  temp  press  etotal  evdwl  ecoul  ebond  eangle  edihed  density
+dump  1  all  custom  50000  deformation-u.lammpstrj  id  mol  type  xu  yu  zu  vx  vy  vz  fx  fy  fz
+dump_modify  1  sort  1  first  no
+dump  2  all  custom  50000  deformation-s.lammpstrj  id  mol  type  xs  ys  zs  vx  vy  vz  fx  fy  fz
+dump_modify  2  sort  1  first  no
+dump  3  all  custom  50000  deformation.lammpstrj  id  mol  type  x  y  z  vx  vy  vz  fx  fy  fz
+dump_modify  3  sort  1  first  no
+log  nvtpd.lammps  append
+
+run  5000000
+unfix 1 
+undump 1
+undump 2
+undump 3
+write_restart nvtpd.restart
+write_data nvtpd.data
+#---------------------------------------
+shell cd ..
+print  "NVTPD done"
+
