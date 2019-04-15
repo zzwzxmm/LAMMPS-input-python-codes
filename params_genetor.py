@@ -49,8 +49,8 @@ for i in range(n):
     outlines.append(newline)
     
 # Write to a new file
-outfile = open(sys.argv[1][:7]+'.params','w')
+outfile = open(sys.argv[1][:-6]+'.params','w')
 for line in outlines:
   outfile.write(line)
 outfile.close()
-print('Done. A new params file is written: {}.params'.format(sys.argv[1][:-7]))
+print('Done. A new params file is written: {}.params'.format(sys.argv[1][:-6]))
