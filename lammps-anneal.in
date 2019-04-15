@@ -1,0 +1,72 @@
+# Lammps atomistic input script
+# 1.em  2.annealing
+#----------------------------------
+# variable ------------------------
+variable  restartname  index  21
+variable  paramname    index  polymer
+variable  infilename   index  anneal
+variable  cycle        equal  41
+variable  initT        equal  190
+variable  deltT        equal  10
+
+#----------------------------------
+echo      screen
+units     real
+atom_style       full
+
+# Interaction potential definition ---
+pair_style     lj/cut/coul/long  12.0 12.0
+bond_style     harmonic  
+special_bonds  lj/coul  0  0  0.5
+kspace_style   pppm/cg  0.001
+dielectric     1.0
+
+#----------------------------------
+read_restart   $restartname}.restart
+include        ${paramname}.params
+
+#-----------------------------------
+timestep       1.0
+shell mkdir EM
+shell cd EM
+
+# EM -------------------------------
+min_style  cg
+minimize  1.0e-5  1.0e-6  1000000  10000
+velocity  all create  300.0 34238230
+write_data  min.data
+
+# ---------------------------------
+fix 5 all shake  1.0e-4  10  0  t  2
+
+# ---------------------------------
+shell  cd ..
+shell mkdir anneal
+shell cp ${infilename}.in  anneal
+shell cd anneal
+
+# label and jump loop -------------
+label loopa
+variable i loop ${cycle}
+variable anneal_T equal v_initT+v_deltT*$i
+
+# ---------------------------------
+reset_timestep  0
+
+# anneal --------------------------
+fix   1  all  npt  temp  ${anneal_T}  ${anneal_T}  1000  iso  1.0  1.0  1000  drag  0.2
+thermo 1000
+thermo_style custom step vol denstiy
+log ${anneal_T}.lammps
+run 500000
+unfix 1 
+write_restart ${anneal_T}.restart
+write_data  ${anneal_T}.data
+
+# loop -----------------------------
+next i
+jump ${infilename}.in loopa
+
+# ----------------------------------
+shell cd ..
+print "ALL Done"
