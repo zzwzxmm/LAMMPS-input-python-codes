@@ -1,0 +1,91 @@
+# LAMMPS input script for standardized atomistic simulations
+
+# Variable definitions
+
+variable  project       index     "polymer"
+variable  fname         index     "nve-polymer"
+variable  source        index     ./
+variable  params        index     ./
+variable  temperature   index     300
+variable  tdamp         index     100.0
+variable  dielectric    index     1
+variable  kappa         index     4
+variable  cutoff        index     12.00
+variable  charge_cutoff index     12.00
+variable  precision     index     0.001
+variable  lseed         index     723853
+variable  vseed         index     1486234
+variable  tequil        index     1000
+variable  trun          index     5000000
+variable  frestart      index     0
+variable  dtrestart     index     1000
+variable  dtdump        index     100000
+variable  dtthermo      index     100000
+variable  timestep      index     2
+variable  tfreq         index     10
+variable  nsample       index     1000
+
+variable  dtime         equal     $tfreq}*${nsample}
+variable  restart       index     ${params}/${project}.restart
+
+# LAMMPS atomistic input script
+
+echo        screen
+units       real
+atom_style  full
+
+# Interaction potential definition
+
+pair_style    lj/cut/coul/long  ${cutoff} $charge_cutoff}
+bond_style    harmonic
+special_bonds lj/coul 0 0 0.5
+read_data     ${project}.data
+include       ${project}.params
+
+# Integration conditions (check)
+
+timestep      ${timestep}
+kspace_style  pppm/cg    ${precision}
+dielectric    ${dielectric}
+fix mom all momentum 100 linear 1 1 1 angular
+
+# Equilibration
+
+thermo        ${dtthermo}
+if "${frestart} != 0" then  "jump SELF simulate"
+velocity      all create  ${temperature} ${vseed} &
+              dist gaussian rot yes mom yes sum yes
+fix           temp all langevin ${temperature} ${temperature} ${tdamp} &
+              ${lseed}
+fix           int  all  nve/limit   0.1
+run           ${tequil}
+unfix         temp
+unfix         int
+write_restart      ${project}.restart2
+
+# Simulation
+
+label         simulate
+fix           temp all  langevin  ${temperature}  ${temperature}  ${tdamp}  &
+              ${lseed}
+fix           int  all nve
+
+# System sampling: pressure
+
+fix           press   all  ave/time   ${tfreq}  ${nsample}  ${dtime}  &
+              c_thermo_temp   &
+              c_temrmo_press[1]  c_thermo_press[2]  c_thermo_press[3]  &
+              c_thermo_press[4]  c_thermo_press[5]  c_thermo_press[6]  &
+              file  ${project}.pressure
+              
+# Run conditions
+
+restart       ${dtrestart}  ${project}.restart1  ${project}.restart2
+dump          1  all  custom  ${dtdump}  ${project}.dump id  type  x  y  z
+run           ${trun}
+
+write_data    ${fname}.data
+write_restart ${fname}.restart
+
+priint        "NVE done"
+
