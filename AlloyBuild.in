@@ -7,6 +7,7 @@ atom_style    atomic
 
 #Building process; Based on NaCl model
 #http://www.52souji.net/build-alloy-model-in-lammps.html
+#http://www.52souji.net/usual-modelling-methods-for-lammps.html
 
 lattice      custom   3.52  a1  1.0 0.0 0.0   a2  0.0 1.0 0.0   a3 0.0 0.0 1.0  &
                       basis 0.0 0.0 0.0 basis 0.5 0.5 0.0 basis 0.5 0.0 0.5 basis 0.0 0.5 0.5 &
