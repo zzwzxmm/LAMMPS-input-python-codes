@@ -2,6 +2,9 @@
 # This input file is used to realize the following procedure.
 # 1.EM 2.NPT eq 3.NVT production run
 # Be sure to modify variable part before use
+
+# 21 step procedure to simulate annealing
+
 ######################################################
 # Variable part ----------------------
 
