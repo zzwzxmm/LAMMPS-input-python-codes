@@ -1,0 +1,85 @@
+#initialization############################################################
+# copied from https://sourceforge.net/p/lammps/mailman/message/25647788/ ##
+
+units           metal
+dimension       3
+boundary        p p p
+atom_style      charge
+
+# Atom definition##########################################################
+lattice         custom 5.4054 &
+                a1 0.9095 0.0000 0.0000 &
+                a2 -0.4547 0.7876 0.0000 &
+                a3 0.0000 0.0000 1.0000 &
+                basis 0.4697 0.0000 0.0000 basis 0.0000 0.4697 0.6667 basis 0.5303 0.5303 0.3333 basis 0.4135 0.2669 0.1191 basis 0.2669 0.4135 0.5475 basis 0.7331 0.1466 0.7857 basis 0.5865 0.8534 0.2142 basis 0.8534 0.5865 0.4524 basis 0.1466 0.7331 0.8809
+
+region          simbox block 0 4 0 4 0 16 units lattice
+
+create_box      2 simbox
+create_atoms    1 box basis 1 1 basis 2 1 basis 3 1 &
+                basis 4 2 basis 5 2 basis 6 2 &
+                basis 7 2 basis 8 2 basis 9 2
+mass            1 28.0855
+mass            2 15.9994
+
+group           siliconatoms type 1
+group           oxygenatoms type 2
+
+set                  group siliconatoms charge 2.4
+set                  group oxygenatoms charge -1.2
+
+
+# Atoms interactions settings##################################
+
+# Si type 1, O type 2
+
+pair_style      hybrid/overlay table linear 3000 coul/long 8.0
+pair_coeff      1 1 table BKSLJ.table SiSi 8.0
+pair_coeff      1 2 table BKSLJ.table SiO 8.0
+pair_coeff      2 2 table BKSLJ.table OO 8.0
+pair_coeff      * * coul/long
+
+kspace_style    pppm 0.0001
+neighbor        10.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+pair_write      1 2 1000 rsq 0.01 10.0 table.txt BKS_Si_O 2.4 -1.2
+pair_write      2 2 1000 rsq 0.01 10.0 table.txt BKS_O_O -1.2 -1.2
+pair_write      1 1 1000 rsq 0.01 10.0 table.txt BKS_Si_Si 2.4 2.4
+
+velocity        all create 10000.0 4928459 dist gaussian
+timestep        0.000905
+thermo_style    custom step temp press &
+                ke pe etotal vol lx ly lz epair
+
+# Quench in NPH with Langevin ##############################
+
+fix             2 all nph aniso 1.01325 1.01325 1.01325 1.01325 1.01325 1.01325 1.0
+fix             3 all langevin 10000.0 300.0 0.033333 48279
+
+thermo          2000
+dump            2 all atom 10000 quenchPROCESS.dump
+dump            3 all atom 3000000 quenchFINAL.dump
+run             3000000
+write_restart  restart.amorF4x4x12
+
+#units           real
+#atom_style      full
+#pair_style      table linear 1000
+#kspace_style    pppm 0.0001
+#kspace_modify   gewald 0.29
+#bond_style      none
+#angle_style     none
+#dihedral_style  none
+#read_data       quench.data
+#pair_coeff      1 1 silica.tabulated BKS_1_1
+#pair_coeff      1 2 silica.tabulated BKS_1_2
+#pair_coeff      2 2 silica.tabulated BKS_2_2
+#special_bonds   0.0 0.0 0.5
+#velocity        all create 5000.0 4928459 dist gaussian
+#fix             1 all nph aniso 1.0 1.0 1.0 1.0 1.0 1.0 1000.0
+#fix             2 all langevin 5000.0 300.0 33.333 48279
+#timestep        1.0
+#thermo          500
+#dump            1 all atom 500000 quench.dump
+#run             500000
