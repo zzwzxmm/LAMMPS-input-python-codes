@@ -1,0 +1,55 @@
+#lammps input to simulate martensite & autenite phase transition
+#literature : Guowu Ren, Huseyin Sehitoglu. Computational Materials Science 123(2016) 19-25
+#meam potential
+
+dimension       3
+units           metal
+boundary        p p p
+atom_style      atomic
+
+read_data       poly8x8x8.data
+
+pair_style      meam/c
+pair_coeff      * * library.meam Ni Ti NiTi.meam Ni Ti
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 1 check yes
+timestep        0.002
+
+shell           mkdir niti_anneal
+shell           cd niti_anneal
+
+comm_modify     cutoff 12
+
+min_style       cg
+minimize        1.0e-15 1.0e-15 1000  1000
+write_restart   min.data
+
+#compute        5 all coord/atom cutoff 2.5
+#compute        rdf all rdf 100 * * cutoff 10.0
+
+thermo          1000
+thermo_style    custom step vol temp density press pe ke etotal enthalpy
+
+velocity        all create  400 429349  rot yes dist  gaussian
+
+#XRD calculations are very slow, suggest not to do, and also to do rdf calculation using self-written scripts or Ovito.
+#compute        1 all xrd 1.54178 Ni  Ti  2Theta  30  60  c 1 1 1 LP  1 echo
+#fix            xrd all ave/histo/weight  100 5 1000  0.0 2.0 100 c_1[*]  mode  vector  file xrd1.txt
+#compute        2 all rdf 1000  cutoff  10.0 
+#fix            rdf all ave/time  100 5 1000  c_2[*]  file  rdf1.txt  mode  vector
+dump            1 all xyz 5000  cool.xyz
+fix             1 all npt temp  400.0 10.0  0.2 iso 1.0 1.0 0.2 drag  1.0
+restart         50000 cool.*.data
+run             500000
+
+undump          1
+unfix           1
+
+dump            2 all xyz 5000  heat.xyz
+fix             2 all npt temp  400.0 10.0  0.2 iso 1.0 1.0 0.2 drag  1.0
+restart         50000 heat.*.data
+run             500000
+
+umdump          2
+unfix           2
